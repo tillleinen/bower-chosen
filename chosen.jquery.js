@@ -144,7 +144,9 @@
       this.inherit_select_classes = this.options.inherit_select_classes || false;
       this.display_selected_options = this.options.display_selected_options != null ? this.options.display_selected_options : true;
       this.display_disabled_options = this.options.display_disabled_options != null ? this.options.display_disabled_options : true;
-      return this.include_group_label_in_selected = this.options.include_group_label_in_selected || false;
+      this.include_group_label_in_selected = this.options.include_group_label_in_selected || false;
+      this.max_shown_results = this.options.max_shown_results || Number.POSITIVE_INFINITY;
+      return this.case_sensitive_search = this.options.case_sensitive_search || false;
     };
 
     AbstractChosen.prototype.set_default_text = function() {
@@ -200,15 +202,21 @@
     };
 
     AbstractChosen.prototype.results_option_build = function(options) {
-      var content, data, _i, _len, _ref;
+      var content, data, data_content, shown_results, _i, _len, _ref;
       content = '';
+      shown_results = 0;
       _ref = this.results_data;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         data = _ref[_i];
+        data_content = '';
         if (data.group) {
-          content += this.result_add_group(data);
+          data_content = this.result_add_group(data);
         } else {
-          content += this.result_add_option(data);
+          data_content = this.result_add_option(data);
+        }
+        if (data_content !== '') {
+          shown_results++;
+          content += data_content;
         }
         if (options != null ? options.first : void 0) {
           if (data.selected && this.is_multiple) {
@@ -216,6 +224,9 @@
           } else if (data.selected && !this.is_multiple) {
             this.single_set_selected_text(this.choice_label(data));
           }
+        }
+        if (shown_results >= this.max_shown_results) {
+          break;
         }
       }
       return content;
@@ -378,9 +389,10 @@
     };
 
     AbstractChosen.prototype.get_search_regex = function(escaped_search_string) {
-      var regex_anchor;
+      var regex_anchor, regex_flag;
       regex_anchor = this.search_contains ? "" : "^";
-      return new RegExp(regex_anchor + escaped_search_string, 'i');
+      regex_flag = this.case_sensitive_search ? "" : "i";
+      return new RegExp(regex_anchor + escaped_search_string, regex_flag);
     };
 
     AbstractChosen.prototype.search_string_match = function(search_string, regex) {
@@ -453,6 +465,7 @@
         case 16:
         case 91:
         case 17:
+        case 18:
           break;
         default:
           return this.results_search();
@@ -514,16 +527,11 @@
     };
 
     AbstractChosen.browser_is_supported = function() {
-      if (window.navigator.appName === "Microsoft Internet Explorer") {
+      if ("Microsoft Internet Explorer" === window.navigator.appName) {
         return document.documentMode >= 8;
       }
-      if (/iP(od|hone)/i.test(window.navigator.userAgent)) {
+      if (/iP(od|hone)/i.test(window.navigator.userAgent) || /IEMobile/i.test(window.navigator.userAgent) || /Windows Phone/i.test(window.navigator.userAgent) || /BlackBerry/i.test(window.navigator.userAgent) || /BB10/i.test(window.navigator.userAgent) || /Android.*Mobile/i.test(window.navigator.userAgent)) {
         return false;
-      }
-      if (/Android/i.test(window.navigator.userAgent)) {
-        if (/Mobile/i.test(window.navigator.userAgent)) {
-          return false;
-        }
       }
       return true;
     };
@@ -549,9 +557,13 @@
         var $this, chosen;
         $this = $(this);
         chosen = $this.data('chosen');
-        if (options === 'destroy' && chosen instanceof Chosen) {
-          chosen.destroy();
-        } else if (!(chosen instanceof Chosen)) {
+        if (options === 'destroy') {
+          if (chosen instanceof Chosen) {
+            chosen.destroy();
+          }
+          return;
+        }
+        if (!(chosen instanceof Chosen)) {
           $this.data('chosen', new Chosen(this, options));
         }
       });
